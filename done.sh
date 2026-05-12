@@ -28,7 +28,7 @@ set +e
 # APP_URL: 本番URLを環境変数またはここに直接書く（例: https://yourapp.com/）
 # 未設定のまま url: 検証を実行するとエラーになります
 APP_URL="${APP_URL:-}"
-AWS_REGION="${AWS_REGION:-ap-northeast-1}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
 # 自分の名前・メールなど、本番レスポンスに絶対漏れてはいけない文字列を grep -i パターンで列挙
 # 例: "myname\|my\.email@example\.com"
 PII_GREP_PATTERN="${PII_GREP_PATTERN:-}"

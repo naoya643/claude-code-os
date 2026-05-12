@@ -47,28 +47,69 @@ The top three layers ship in this repo. The bottom layer (AWS IAM / branch prote
 ## Quick start
 
 ```bash
-# 1. Copy claude-os/ into your project root
-cp -r claude-os/ /path/to/your-repo/
-
-# 2. cd into your repo
+# 0. Make sure your project is a git repository
 cd /path/to/your-repo/
+git init   # skip if already a git repo
 
-# 3. Move CLAUDE.md to the repo root (Claude Code reads it on boot)
-mv claude-os/CLAUDE.md .
-mv claude-os/WORKING.md .
-mv claude-os/done.sh .
+# 1. Copy this kit into your repo
+cp -r /path/to/claude-os/* .
+cp -r /path/to/claude-os/.github .   # workflows are in a dotfile dir — copy explicitly
 
-# 4. Replace placeholders (see "Placeholders" below)
+# 2. Move boot files to the repo root (Claude Code reads CLAUDE.md from root)
+#    (If you copied the whole kit into a subdirectory, mv the boot files up.)
+ls CLAUDE.md WORKING.md done.sh   # should exist at repo root
+
+# 3. Make scripts executable
+chmod +x done.sh scripts/*.sh
+
+# 4. Install the physical guards (git hooks)
+bash scripts/install_hooks.sh
+# → installs .git/hooks/pre-commit, commit-msg, pre-push
+# → idempotent; re-run anytime
+
+# 5. Replace placeholders (see "Placeholders" below)
 #    Use your editor's find-and-replace, or:
-grep -rl "{{YOUR_PROJECT_NAME}}" . | xargs sed -i '' 's/{{YOUR_PROJECT_NAME}}/myapp/g'
+grep -rl "{{YOUR_PROJECT_NAME}}" . --include="*.md" --include="*.sh" \
+  | xargs sed -i '' 's/{{YOUR_PROJECT_NAME}}/myapp/g'
 
-# 5. Make done.sh executable
-chmod +x done.sh
+# 6. Verify the install
+bash scripts/session_bootstrap.sh
+# → should print "✅ 起動チェック完了" (or "❌" with the reason — fix and re-run)
 
-# 6. Start a Claude Code session — it will read CLAUDE.md and follow the rules
+# 7. Start a Claude Code session — it will read CLAUDE.md and follow the rules
 ```
 
 For a step-by-step guide in Japanese, see [docs/setup-guide.md](docs/setup-guide.md).
+
+### What got installed
+
+After step 4 your repo has these guards in place:
+
+| Guard | Where | Blocks |
+|---|---|---|
+| `pre-commit` hook | `.git/hooks/pre-commit` | PII / live secrets / `deploy.sh` direct calls / git error suppression / `CLAUDE.md` over 250 lines |
+| `commit-msg` hook | `.git/hooks/commit-msg` | `feat:`/`fix:`/`perf:` commits without a `Verified:` line |
+| `pre-push` hook | `.git/hooks/pre-push` | direct push to `main` / `master` |
+
+Bypass in real emergencies only: `git commit --no-verify` / `git push --no-verify`.
+
+### Verify it actually works (the "is this thing on" test)
+
+After install, run a quick smoke test:
+
+```bash
+# Test 1: the soft-language checker should pass on a fresh kit
+bash scripts/check_soft_language.sh
+# → "✅ ソフト言語混入なし"
+
+# Test 2: bootstrap should run without git pull errors
+bash scripts/session_bootstrap.sh
+# → "✅ 起動チェック完了"
+
+# Test 3: the commit-msg hook should reject a 'fix:' commit without Verified:
+echo "test" > /tmp/_test && git add /tmp/_test 2>/dev/null
+git commit -m "fix: smoke test" 2>&1 | grep -q "Verified:" && echo "✅ commit-msg hook is alive" || echo "❌ commit-msg hook did not fire"
+```
 
 ---
 
@@ -79,11 +120,17 @@ For a step-by-step guide in Japanese, see [docs/setup-guide.md](docs/setup-guide
 | `CLAUDE.md` | Boot file Claude Code reads on every session. Hard cap: 250 lines. Points to the rule docs. |
 | `WORKING.md` | Live registry of which session is editing which files. Prevents parallel-edit collisions. |
 | `done.sh` | Script that physicalizes "done" — verifies prod URL, CloudWatch errors, etc. before flipping a task to done. |
+| `scripts/install_hooks.sh` | Installs `.git/hooks/pre-commit`, `commit-msg`, `pre-push` — the physical guards. |
+| `scripts/session_bootstrap.sh` | Boot-time check: pulls main, lists active WORKING.md tasks, removes stale rows (>8h), enforces 1-Code-session cap. |
+| `scripts/check_soft_language.sh` | Detects "気をつける/注意する/意識する/確認する" in 「仕組み的対策」 sections — fails CI so rules stay physical. |
+| `.github/workflows/auto-merge.yml` | Enables GitHub native auto-merge on PRs (squash when CI green). |
+| `.github/workflows/claude-md-line-limit.yml` | Fails PR if `CLAUDE.md` exceeds 250 lines. |
 | `docs/rules/global-baseline.md` | Cross-project rules: completion definition, boot checks, session concurrency caps, model selection. |
 | `docs/rules/ci-and-merge-workflow.md` | Who confirms CI? Who merges? Hand-off between Code and Dispatch sessions. |
 | `docs/rules/cowork-aws-policy.md` | How to wire git + AWS MCP with defense-in-depth (CI on git side, IAM Deny on AWS side). |
 | `docs/rules/bug-prevention.md` | **Empty template.** Grow this with bugs your project keeps re-introducing. |
 | `docs/rules/design-mistakes.md` | **Empty template.** Grow this with design assumptions that turned out wrong. |
+| `docs/failure-records/lessons-learned.md` | **Empty template.** Append-only record of incidents — Why1-5 + physical fix. |
 | `docs/setup-guide.md` | Step-by-step setup in Japanese. |
 
 ---
@@ -201,23 +248,51 @@ CI 層          done.sh ＋ git hooks
 ## クイックスタート
 
 ```bash
-# 1. claude-os/ をプロジェクトに展開
-cp -r claude-os/ /path/to/your-repo/
+# 0. プロジェクトが git リポジトリであることを確認
 cd /path/to/your-repo/
+git init   # 既に git リポジトリなら skip
+
+# 1. キットをコピー
+cp -r /path/to/claude-os/* .
+cp -r /path/to/claude-os/.github .   # workflows は dotfile dir なので明示的にコピー
 
 # 2. ルートに配置（Claude Code が起動時に読む）
-mv claude-os/CLAUDE.md .
-mv claude-os/WORKING.md .
-mv claude-os/done.sh .
+ls CLAUDE.md WORKING.md done.sh   # repo root に存在することを確認
 
-# 3. プレースホルダー置換
-grep -rl "{{YOUR_PROJECT_NAME}}" . | xargs sed -i '' 's/{{YOUR_PROJECT_NAME}}/myapp/g'
+# 3. 実行権限付与
+chmod +x done.sh scripts/*.sh
 
-# 4. 実行権限付与
-chmod +x done.sh
+# 4. git hook（物理ガード）をインストール
+bash scripts/install_hooks.sh
+# → .git/hooks/pre-commit, commit-msg, pre-push が入る
+# → 冪等。何度実行しても OK。
+
+# 5. プレースホルダー置換
+grep -rl "{{YOUR_PROJECT_NAME}}" . --include="*.md" --include="*.sh" \
+  | xargs sed -i '' 's/{{YOUR_PROJECT_NAME}}/myapp/g'
+
+# 6. 動作確認
+bash scripts/session_bootstrap.sh
+# → 「✅ 起動チェック完了」が出れば OK
 ```
 
 詳細手順は [docs/setup-guide.md](docs/setup-guide.md) を参照。
+
+### インストール後の動作確認
+
+```bash
+# ① ソフト言語検査が通る（空テンプレなので OK のはず）
+bash scripts/check_soft_language.sh
+
+# ② bootstrap が通る
+bash scripts/session_bootstrap.sh
+
+# ③ commit-msg hook が生きている（Verified: 無しの fix: が reject されるか）
+echo "test" > /tmp/_smoke && git add /tmp/_smoke 2>/dev/null
+git commit -m "fix: smoke test" 2>&1 | grep -q "Verified:" \
+  && echo "✅ commit-msg hook は生きている" \
+  || echo "❌ commit-msg hook が動いていない"
+```
 
 ## 各ファイルの役割
 

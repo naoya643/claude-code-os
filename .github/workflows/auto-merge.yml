@@ -1,0 +1,56 @@
+# Auto-merge PRs (squash) — CI 全 green になったら GitHub が自動 squash merge する
+#
+# Why:
+#   Claude Code セッションが PR を作っても、auto-merge が有効化されていないと毎回手動マージが必要。
+#   この workflow が PR 作成イベントで `gh pr merge --auto --squash --delete-branch` を発動し、
+#   GitHub の native auto-merge を ON にする。required checks が全 green になった瞬間に squash merge。
+#
+# 前提:
+#   - リポジトリ設定 `allow_auto_merge: true` 必須
+#   - branch protection で required status checks を設定推奨（未設定だと auto-merge が即時 merge して危険）
+#
+# セキュリティ:
+#   - draft PR は除外
+#   - PR 作成者がリポジトリ owner と一致する PR のみ対象（外部コラボ・dependabot は無視）
+#
+# 後続 workflow を auto-trigger したい場合:
+#   GITHUB_TOKEN による merge は他の workflow を trigger しない（GitHub の仕様）。
+#   merge 後に deploy 系 workflow を発火させたい場合は、scope=repo,workflow の PAT を
+#   secret `AUTO_MERGE_PAT` に登録してください。
+name: Auto-merge PRs (squash when CI green)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    name: enable squash auto-merge
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login == github.repository_owner
+    steps:
+      - name: Enable auto-merge (squash + delete branch)
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_PAT || secrets.GITHUB_TOKEN }}
+          PAT_PRESENT: ${{ secrets.AUTO_MERGE_PAT != '' }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          echo "PR #${PR_NUMBER} by ${PR_AUTHOR} → ${PR_URL}"
+          if [ "${PAT_PRESENT}" != "true" ]; then
+            echo "::warning::AUTO_MERGE_PAT secret が未設定 — GITHUB_TOKEN にフォールバック中。"
+            echo "::warning::この状態では PR merge 後に deploy 系 workflow が auto-trigger されません。"
+            echo "::warning::scope=repo,workflow の PAT を Settings → Secrets → AUTO_MERGE_PAT として登録すれば解消されます。"
+          else
+            echo "✅ AUTO_MERGE_PAT 使用中 — merge 後の後続 workflow も正常に auto-trigger される想定"
+          fi
+          gh pr merge "$PR_URL" --auto --squash --delete-branch
+          echo "✅ auto-merge enabled (squash, delete-branch)"

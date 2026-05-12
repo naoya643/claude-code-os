@@ -1,0 +1,31 @@
+# CLAUDE.md 行数上限チェック (250 行)
+#
+# Why:
+#   LLM は長文の指示ファイルを後半ほど守らない（実測）。
+#   CLAUDE.md を 250 行以内に収めることで「冒頭重視」「中盤漂流」の劣化を抑える。
+#   超過分は docs/rules/*.md へ外出ししてリンクで参照する。
+name: CLAUDE.md line limit
+
+on:
+  pull_request:
+    paths:
+      - "CLAUDE.md"
+
+jobs:
+  line-limit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 250 行を超えていないか確認
+        run: |
+          if [ ! -f CLAUDE.md ]; then
+            echo "CLAUDE.md not found, skipping"
+            exit 0
+          fi
+          LINES=$(wc -l < CLAUDE.md)
+          if [ "$LINES" -gt 250 ]; then
+            echo "❌ CLAUDE.md が ${LINES} 行です。250 行を超えています。"
+            echo "   詳細ルールは docs/rules/*.md に移してください。"
+            exit 1
+          fi
+          echo "✅ CLAUDE.md は ${LINES} 行です。"
