@@ -1,0 +1,57 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  product-repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: articles/ must not exist (product repo only)
+        run: |
+          if [ -d "articles" ]; then
+            echo "::error::articles/ は記事ディレクトリ。製品リポジトリに含めてはいけない（Zenn Slug 衝突の原因）"
+            ls -la articles/
+            exit 1
+          fi
+          echo "OK: articles/ not present"
+
+      - name: docs/meta/ must not exist (戦略文書は非公開)
+        run: |
+          if [ -d "docs/meta" ]; then
+            echo "::error::docs/meta/ は内部戦略文書。公開リポジトリに含めてはいけない"
+            ls -la docs/meta/
+            exit 1
+          fi
+          echo "OK: docs/meta/ not present"
+
+      - name: CLAUDE.md line limit (250 行以内)
+        run: |
+          if [ -f "CLAUDE.md" ]; then
+            lines=$(wc -l < CLAUDE.md | tr -d ' ')
+            if [ "$lines" -gt 250 ]; then
+              echo "::error::CLAUDE.md が ${lines} 行（上限 250 行）"
+              exit 1
+            fi
+            echo "OK: CLAUDE.md ${lines} 行"
+          fi
+
+      - name: shell scripts syntax check
+        run: |
+          fail=0
+          for f in scripts/*.sh done.sh; do
+            [ -f "$f" ] || continue
+            if bash -n "$f"; then
+              echo "OK: $f"
+            else
+              echo "::error::syntax error in $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: soft-language check (仕組み的対策セクション)
+        run: |
+          if [ -f scripts/check_soft_language.sh ]; then
+            bash scripts/check_soft_language.sh
+          fi

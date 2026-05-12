@@ -79,30 +79,42 @@
 
 ## 過去の失敗
 
-<!-- ここから下に、上のテンプレを使って 1 件ずつ追記する -->
-<!-- 例:
+<!-- ここから下に、上のテンプレを使って 1 件ずつ追記する。最新が上。 -->
 
-## 2026-01-15 ads.txt の AdSense pub-id 未登録
+## 2026-05-12 articles/ が公開リポジトリに混入し Zenn Slug 衝突
 
 **何が起きたか**:
-  広告スクリプトを index.html に追加したが ads.txt を更新せず、AdSense が pub-id を認識せず広告配信が 3 日間停止。
+  `publish-to-claude-code-os.sh` の allowlist に「除外するもの」の denylist がなく、`articles/` が
+  公開リポジトリ (naoya643/claude-code-os) に push されてしまった。Zenn 連携のある公開リポジトリで
+  Slug 衝突エラーが発生し、初回出版時に気付いた。
 
 **なぜなぜ 5 段階**:
-  Why1: ads.txt に pub-id が書かれていなかった
-  Why2: ads.txt が Google に別途クロールされる独立ファイルだと知らなかった
-  Why3: 外部システム統合の手順チェックリストが存在しなかった
-  Why4: このプロジェクトで初めての種類のタスクで、汎用化されたルールがなかった
-  Why5: 「新規外部システム統合」を一般的なパターンとして扱う習慣がなかった
+  Why1: 公開リポジトリに `articles/` が含まれていた
+  Why2: publish スクリプトの allowlist は「含めるもの」だけ定義され、「絶対に含めてはいけないもの」がなかった
+  Why3: 開発リポジトリで記事ファイルと製品ファイルが同じトップレベルに混在していた
+  Why4: 公開リポジトリ側に「混入してはいけないもの」を物理検出する CI が存在しなかった
+  Why5: 「公開してはいけないファイル」のルールが「気を付ける」レベルで運用され、構造化されていなかった
 
 **仕組み的対策**:
-  ID: 2026-01-15-adsense-pubid-sync
-  ① index.html の `ca-pub-XXXX` と ads.txt の `pub-XXXX` 整合性を pre-commit で物理検証
-     実装場所: .git/hooks/pre-commit (claude-os/scripts/install_hooks.sh で配布)
+  ID: 2026-05-12-public-repo-denylist
+  ① `articles/` と `docs/meta/` の存在を公開リポジトリの CI で物理検出 → ビルド fail
+     実装場所: .github/workflows/ci.yml (product-repo-hygiene job)
      状態: ✅ 実装済
 
+  ② publish スクリプト側 (ai-company/scripts/publish-to-claude-code-os.sh) で
+     `articles/` を allowlist から除外
+     実装場所: ai-company リポジトリ b29abb06
+     状態: ✅ 実装済
+
+  ③ 履歴に残った混入コミットを `git filter-repo --path articles --invert-paths` で除去し
+     公開リポジトリの履歴をクリーンアップ
+     実装場所: 本セッションで実行
+     状態: ✅ 実装済
+
+**横展開チェック**:
+  - [x] `docs/meta/` も同 CI で検出（同 job 内 step）
+  - [ ] `prompts/` `docs/decisions/` 等の他の内部ファイルが allowlist 経路で混入するリスクの棚卸し（次回 publish 前に実施）
+
 **関連 PR / commit**:
-  - PR #<num>
-
--->
-
-(未記入)
+  - ai-company b29abb06 (allowlist から articles/ 除外)
+  - public repo: 本セッションで履歴書き換え + CI 追加
