@@ -1,0 +1,10 @@
+# Zenn 連携用の空ディレクトリマーカー
+#
+# このディレクトリには Zenn 記事を置きません。
+# claude-code-os は claude-code-os 製品 (CLAUDE.md template / scripts / docs) の
+# 公開リポジトリで、Zenn 記事の公開は別連携リポで行います。
+#
+# このファイルが消えると Zenn が「articles/ ディレクトリが見つかりません」と
+# 警告するため、物理マーカーとして残しています。
+#
+# 編集経路: 親 repo (naoya643/ai-company) の scripts/publish-to-claude-code-os.sh
