@@ -1,152 +1,47 @@
 # ⚡ セッション開始時に必ず最初に実行すること
 
 ```bash
-bash {{PROJECT_ROOT}}/scripts/session_bootstrap.sh
+bash ~/ai-company/scripts/session_bootstrap.sh
 ```
 
-完了サマリが出たら「✅ 起動チェック完了」と報告して着手する。
-起動後は `TASKS.md` で未着手タスクを確認し、優先度の高いものから実行する。
-`WORKING.md` に自分の行を追記してからコード変更を始める（物理ルール：宣言なし編集禁止）。
+完了サマリが出たら「✅ 起動チェック完了」と報告し、`projects/P006-claude-code-os/TASKS.md` から未着手タスクを選ぶ。**P001 ルートの `WORKING.md`**（`~/ai-company/WORKING.md`・会社共通）にタスク名先頭 `[P006]` 付きで宣言してから着手する。
+
+> P001 共通ルール（優先順位／絶対禁止／完了の定義／タスク消化フロー）は `~/ai-company/CLAUDE.md` をそのまま継承する。本ファイルは差分のみ記載。
 
 ---
 
-## このリポジトリ（{{YOUR_PROJECT_NAME}}）の役割
+## このプロジェクトの役割
 
-{{YOUR_PROJECT_NAME}} は {{ONE_LINE_PURPOSE}}。
+Claude Code OS は ai-company（P001）の会社 OS を**汎用パッケージとして外部に販売／公開する試み**。P001 内部で実証された仕組みを Claude Code 利用者向けに切り出して配布する。
 
-このプロジェクトでは以下を提供する:
-
-- ルール一式（`docs/rules/`）と物理ガード（`guards/`、CI workflow）
-- セッション競合管理（`WORKING.md`）・タスク管理（`TASKS.md`）
-- 起動 / 完了スクリプト（`scripts/session_bootstrap.sh` / `done.sh`）
-
----
-
-## 優先順位（判断に迷ったらこの順）
-
-| 優先度 | 守るもの |
+| 項目 | パス／URL |
 |---|---|
-| 1 | このリポジトリ自身の動作（CI が全 green / guards / bootstrap が正しく走る） |
-| 2 | データ整合性（DB・ストレージ等の不可逆データ） |
-| 3 | 本番サービスの可用性 |
-| 4 | アーキテクチャの一貫性（設計意図を維持） |
-| 5 | タスクの完了 |
+| 作業ディレクトリ | `projects/P006-claude-code-os/` |
+| 戦略・WBS・設計書 | `projects/P006-claude-code-os/docs/` |
+| 公開素材（OSS/BOOTH/Zenn 原稿） | `projects/P006-claude-code-os/product/` |
+| 公開先リポ（GitHub public） | `<owner-handle>/claude-code-os` |
+| 完了ログ | `projects/P006-claude-code-os/HISTORY.md` |
 
 ---
 
-## 絶対禁止（物理ガード + 行動で守る）
+## P006 固有ルール（公開リスクへの物理対策）
 
 | 禁止 | 代わりに |
 |---|---|
-| 実機確認なしで「完了」と報告 | 本番 URL / ログ / 実機で動作確認してから報告 |
-| 不可逆操作（リソース delete · force push · DB drop）を無確認実行 | オーナーに確認してから実行 |
-| 同名ファイルを `WORKING.md` 宣言なしで編集 | `WORKING.md` に行を追記してから着手 |
-| 効果検証待ちでセッションを開いたまま待機 | スケジューラーに渡して即クローズ |
-| コードセッションを同時 2 件以上起動 | 前セッション完了を確認してから次を起動 |
-| 「気をつける」だけの対策を仕組み的対策と呼ぶ | CI / hook / SLI で物理化してから対策と記録する |
-| 設計書（.md）なしでコード変更 PR を出す | まず設計書 PR を出してオーナー承認を得てからコード変更 PR |
+| `product/` 配下に内部情報を書く（内部プロジェクト名 / AWS アカウント ID / 顧客 PII / 社内メールアドレス等） | 抽象化・匿名化してから記述。実例が必要なら "ある SaaS" 等の汎用表現に置換 |
+| 公開チェックなしで公開リポへ同期 | `bash scripts/check-publish-safety.sh` で全項目 ✅ を確認してから `scripts/publish-to-claude-code-os.sh` |
+| `<owner-handle>/claude-code-os`（公開）へ素の `git push` | 同期は `scripts/publish-to-claude-code-os.sh` 経由のみ（pre-push hook が `PUBLISH_VIA_SCRIPT=1` 以外を物理 reject） |
+| `docs/rules/` `docs/meta/` を公開リポへ同期 | P001 内部用。allowlist 外なので自動除外される（allowlist を手で広げない） |
+| P006 公開素材の動作確認を ai-company の worktree で完結 | `claude-code-os-dev` リポへ移動して実施（2026-05-12 インシデント対応） |
 
-> これらは「気をつける」では守れないため、`guards/` 配下のスクリプトと CI workflow で物理化している。
-> 詳細は `docs/rules/guards.md`（同梱 BOOTH キット）を参照。
+公開素材を触る PR は `scripts/check-publish-safety.sh` ✅ が P001 完了の定義に加えて追加条件となる。
 
 ---
 
-## 完了の定義
-
-```
-完了 = 本番 URL / ログ / 実機で動作確認済
-     + done.sh 実行済
-     + Verified: 行付き commit
-     + 横展開確認済（PR description に「横展開:」セクション・該当なしなら明記）
-     + 効果検証の引き継ぎ済（Expected-Effect / Eval-Due 記録 or 該当なし明記）
-```
-
-「コードが書けた」「PR が merge された」は完了ではない。
-横展開未確認・効果検証未登録の merge は未完了扱い。
-PR 作成時は `gh pr merge --auto --squash` を付けて即 exit。CI green 後に自動 squash merge される。
-
----
-
-## 振る舞いの絶対ルール
-
-| ルール | 内容 |
-|---|---|
-| 言語 | {{LANGUAGE_PREFERENCE}}。簡潔・誠実・媚びない |
-| 根本原因 | 対症療法ではなく根本原因を直す。足回りで誤魔化さない |
-| 完了の定義 | push しただけは未完了。本番 URL / 観測ログ / 実機で動作確認した状態のみ「完了」 |
-| 変更前の依存確認 | コード変更前に「このファイルが何に依存されているか」を口に出す。言えなければ変更しない |
-| 並行編集禁止 | 同名ファイルを `WORKING.md` 宣言なしで触らない |
-| 秘密情報の直書き禁止 | 環境変数か Secrets Manager 必須 |
-| なぜなぜ分析 | 問題発生時 Why1〜Why5 + 仕組み的対策 3 つ以上を記録する。テーブル 1 行は再発防止と呼ばない |
-| 仕組み的対策の質 | 「外部観測（SLI / metric / 警告）」または「物理ゲート（CI / hook / scripts）」を最低 1 つ含む |
-
----
-
-## ドキュメント構成
-
-| ファイル | 役割 | 上限 |
-|---|---|---|
-| `CLAUDE.md` | 起動チェック + 絶対ルール本体（このファイル） | 250 行（CI で物理ガード） |
-| `WORKING.md` | 着手中タスクの並走宣言 | — |
-| `TASKS.md` | 未着手タスクキュー | — |
-| `done.sh` | タスク完了処理（実機確認 + 管理ファイル更新） | — |
-| `docs/rules/global-baseline.md` | 全プロダクト共通の前提（BOOTH キット同梱） | — |
-| `docs/rules/bug-prevention.md` | バグ再発防止ルール（BOOTH キット同梱） | — |
-| `docs/rules/design-mistakes.md` | 過去の設計ミスパターン（BOOTH キット同梱） | — |
-| `docs/lessons-learned.md` | なぜなぜ事例集（append-only） | — |
-
----
-
-## AI が動きやすくなるための原則
-
-| 原則 | 理由 |
-|---|---|
-| ルールは表で書く | LLM はテーブル形式の方が遵守率が高い。長文の散文ルールは無視されやすい |
-| 「気を付ける」は禁止 | 仕組み的対策に「注意する」「気を付ける」は書かない。CI / hook / metric / SLI / scripts のいずれかで物理化する |
-| 1 ステップ 1 動作 | 「A して B して C する」を 1 行に押し込まない。LLM は途中 step を端折る |
-| 例を 1 つ必ず添える | 抽象ルールには「✅ 良い例」「❌ 悪い例」をペアで書く |
-| 起動コストを下げる | `CLAUDE.md` は 250 行以内・必読は 4 ファイル以内・サマリは bootstrap が 1 行で出す |
-| 同じ規則を 2 箇所に書かない | 重複は drift の原因 |
-
----
-
-## DO / DON'T
-
-**DO**:
-- 不確実な作業前に依存ファイルを声に出す
-- 完了報告に証跡（URL / status / log path）を必ず添える
-- 8h 超のセッションは `WORKING.md` に残さない
-- なぜなぜは Why1〜Why5 + 仕組み的対策 3 つ以上で書く
-
-**DON'T**:
-- push しただけで「完了」と報告
-- ルールを散文で書く（表形式に統一）
-- 同じタスク ID を別件に再利用（衝突回避）
-- 「気をつける」「注意する」だけの対策を仕組み化と呼ぶ
-
----
-
-## 詳細ルールの場所（BOOTH キット同梱）
+## 詳細ルールの場所
 
 | カテゴリ | ファイル |
 |---|---|
-| 全プロダクト共通の前提 | `docs/rules/global-baseline.md` |
-| バグ防止パターン | `docs/rules/bug-prevention.md` |
-| 設計ミスパターン | `docs/rules/design-mistakes.md` |
-| guards/ 設計原則（1機能 / 50行 / 5行ヘッダー） | `docs/rules/guards.md` |
-| 過去の失敗の汎用化 | `docs/lessons-learned-abstracted.md` |
-
----
-
-## プレースホルダー一覧
-
-このテンプレートを自分のプロジェクトに導入する際は以下を置換する:
-
-| プレースホルダー | 意味 | 例 |
-|---|---|---|
-| `{{YOUR_PROJECT_NAME}}` | プロジェクト名 | `my-app` |
-| `{{PROJECT_ROOT}}` | リポジトリのローカル絶対パス | `~/work/my-app` |
-| `{{ONE_LINE_PURPOSE}}` | プロジェクトの 1 行説明 | `個人ブログの記事配信` |
-| `{{LANGUAGE_PREFERENCE}}` | 応答言語 | `日本語で対応` / `English` |
-
-> 置換後はこのセクションを削除して構わない。
+| 戦略・WBS・製品設計 | `projects/P006-claude-code-os/docs/{strategy,wbs,product-design}.md` |
+| 公開チェックリスト | `projects/P006-claude-code-os/product/publish-checklist.md` |
+| P001 共通ルール | `~/ai-company/CLAUDE.md` および `docs/rules/global-baseline.md` |
