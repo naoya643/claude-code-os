@@ -7,14 +7,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: articles/ must not exist (product repo only)
+      - name: articles/ must not contain *.md (Zenn slug collision guard)
         run: |
+          # articles/ ディレクトリ自体は OK (Zenn が「articles ディレクトリが見つかりません」と
+          # 警告するため .gitkeep 等のマーカーで存在させる)。
+          # 実 Zenn 記事 (*.md) が混入したら reject — slug 衝突の原因なので絶対 NG。
           if [ -d "articles" ]; then
-            echo "::error::articles/ は記事ディレクトリ。製品リポジトリに含めてはいけない（Zenn Slug 衝突の原因）"
-            ls -la articles/
-            exit 1
+            md_files=$(find articles -maxdepth 2 -name '*.md' -print 2>/dev/null || true)
+            if [ -n "$md_files" ]; then
+              echo "::error::articles/ に .md ファイルが混入しています (Zenn Slug 衝突の原因)"
+              echo "$md_files"
+              exit 1
+            fi
+            echo "OK: articles/ 配下に .md は無し (現状: $(ls -A articles/ | tr '\n' ' '))"
+          else
+            echo "OK: articles/ not present (Zenn 連携前なら問題なし)"
           fi
-          echo "OK: articles/ not present"
 
       - name: docs/meta/ must not exist (戦略文書は非公開)
         run: |
